@@ -1,0 +1,41 @@
+name: Fetch podcast feed enrichment
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_id:
+        description: "Batch directory under batches/ containing targets.json"
+        required: true
+        type: string
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r worker/requirements.txt
+
+      - name: Enrich podcast feeds
+        run: |
+          python worker/fetch_feeds.py \
+            --targets "batches/${{ inputs.batch_id }}/targets.json" \
+            --out "feed-results-${{ inputs.batch_id }}.json"
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-results-${{ inputs.batch_id }}
+          path: feed-results-${{ inputs.batch_id }}.json
+          retention-days: 30
+          if-no-files-found: error
