@@ -1,3 +1,4 @@
 curl_cffi>=0.10
 beautifulsoup4>=4.12
 playwright>=1.44
+feedparser>=6.0
