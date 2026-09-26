@@ -45,7 +45,8 @@ jobs:
           COOKIE_ARG=""
           [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
           # shellcheck disable=SC2086
-          yt-dlp $COOKIE_ARG --extractor-args "youtube:player_client=android,web" -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
+          yt-dlp $COOKIE_ARG --extractor-args "youtube:player_client=tv,android,web" \
+            -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
           cat formats.txt
 
       - name: Download section
@@ -53,13 +54,16 @@ jobs:
           COOKIE_ARG=""
           [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
           # shellcheck disable=SC2086
-          yt-dlp --verbose $COOKIE_ARG --extractor-args "youtube:player_client=android,web" -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
+          yt-dlp --verbose $COOKIE_ARG --extractor-args "youtube:player_client=tv,android,web" \
+            -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
             --download-sections "${{ inputs.section }}" \
             -o "${{ inputs.out_name }}.%(ext)s" \
-            "${{ inputs.video_url }}" 2>&1 | tail -30
-          ls -la "${{ inputs.out_name }}."*
+            "${{ inputs.video_url }}" > download.log 2>&1 || echo "YTDLP_EXIT=$?" >> download.log
+          tail -30 download.log
+          ls -la "${{ inputs.out_name }}."* >> download.log 2>&1 || true
 
       - name: Probe resolution
+        if: always()
         run: |
           ffprobe -v error -select_streams v:0 \
             -show_entries stream=width,height,codec_name,duration \
@@ -69,12 +73,19 @@ jobs:
         if: always()
         run: rm -f yt_cookies.txt
 
-      - name: Upload artifact
+      - name: Upload artifact (always, includes diagnostics)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: video-section-${{ inputs.out_name }}
           path: |
             ${{ inputs.out_name }}.*
             formats.txt
+            download.log
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Fail if no video downloaded
+        if: always()
+        run: |
+          compgen -G "${{ inputs.out_name }}.*" > /dev/null || { echo "no video file produced; see download.log in artifact"; exit 1; }
