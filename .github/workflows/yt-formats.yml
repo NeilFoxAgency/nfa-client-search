@@ -14,12 +14,12 @@ jobs:
       contents: read
       issues: write
     steps:
-      - name: Scrape player response from watch HTML
+      - name: Probe watch HTML structure
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - << 'PYEOF' > body.txt 2>&1 || true
-          import re, json, urllib.request
+          import re, urllib.request
           url = "${{ inputs.video_url }}"
           req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
@@ -27,26 +27,16 @@ jobs:
           html = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", errors="replace")
           print("video:", url)
           print("html bytes:", len(html))
-          m = re.search(r"ytInitialPlayerResponse\s*=\s*(\{.+?\});", html, re.S)
-          if not m:
-              print("NO ytInitialPlayerResponse found")
-              raise SystemExit
-          pr = json.loads(m.group(1))
-          sd = pr.get("streamingData", {})
-          fmts = sd.get("formats", []) + sd.get("adaptiveFormats", [])
-          print("total formats:", len(fmts))
-          seen = set()
-          for f in fmts:
-              h = f.get("height"); w = f.get("width")
-              q = f.get("qualityLabel", f.get("quality", "?"))
-              key = (w, h, q)
-              if key not in seen:
-                  seen.add(key)
-                  print(f"{w}x{h} {q} hasAudio={f.get('audioQuality') is not None or 'audio' in str(f.get('mimeType'))} url={'yes' if f.get('url') else 'no'}")
-          vd = pr.get("videoDetails", {})
-          print("title:", vd.get("title"))
-          print("lengthSeconds:", vd.get("lengthSeconds"))
-          print("isLiveContent:", vd.get("isLiveContent"))
+          for pat in ["ytInitialPlayerResponse", "streamingData", "qualityLabel", "playerResponse",
+                      "confirm you.re not a bot", "signin", "consent", "og:title", "lengthSeconds"]:
+              print(f"{pat!r}: {html.count(pat)}")
+          m = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+          print("og:title:", m.group(1) if m else None)
+          m2 = re.search(r'"lengthSeconds":"(\d+)"', html)
+          print("lengthSeconds:", m2.group(1) if m2 else None)
+          # any itag-ish format hints
+          quals = sorted(set(re.findall(r'"qualityLabel":"([^"]+)"', html)))
+          print("qualityLabels:", quals[:20])
           PYEOF
           cat body.txt
-          gh issue create --repo NeilFoxAgency/nfa-client-search --title "yt-html-formats ${{ github.run_id }}" --body-file body.txt
+          gh issue create --repo NeilFoxAgency/nfa-client-search --title "yt-html-probe ${{ github.run_id }}" --body-file body.txt
