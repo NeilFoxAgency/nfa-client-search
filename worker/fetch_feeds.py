@@ -276,6 +276,7 @@ def enrich_one(target):
         "last_episode_date": None, "days_since_last_episode": None,
         "sponsor_mentions": 0, "sponsor_brands": [],
         "has_premium_sponsor": False,
+        "recent_episode_titles": None,
         "fetch_status": "error", "fetch_error": None,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -360,6 +361,21 @@ def enrich_one(target):
         except Exception:
             pass
 
+    # --- 3 newest episode titles (for outreach personalization) ---
+    recent_titles = []
+    for entry in entries[:3]:
+        t = (entry.get("title") or "").strip()
+        if not t:
+            continue
+        pp = entry.get("published_parsed") or entry.get("updated_parsed")
+        pub = None
+        if pp:
+            try:
+                pub = date(pp[0], pp[1], pp[2]).isoformat()
+            except Exception:
+                pass
+        recent_titles.append({"title": t[:200], "pub_date": pub})
+
     rec.update({
         "has_video": video_ct > 0,
         "video_episode_count": video_ct,
@@ -368,6 +384,7 @@ def enrich_one(target):
         "sponsor_mentions": sponsor_episodes,
         "sponsor_brands": sorted(sponsor_brands),
         "has_premium_sponsor": len(sponsor_brands) > 0,
+        "recent_episode_titles": recent_titles or None,
         "fetch_status": "ok",
         "fetch_error": "truncated_recovered" if truncated else None,
     })
