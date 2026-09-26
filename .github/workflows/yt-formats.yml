@@ -21,4 +21,4 @@ jobs:
           pip install -q -U yt-dlp
           yt-dlp -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
           { echo "video: ${{ inputs.video_url }}"; echo; cat formats.txt; } > body.txt
-          gh issue create --title "yt-formats ${{ github.run_id }}" --body-file body.txt
+          gh issue create --repo NeilFoxAgency/nfa-client-search --title "yt-formats ${{ github.run_id }}" --body-file body.txt
