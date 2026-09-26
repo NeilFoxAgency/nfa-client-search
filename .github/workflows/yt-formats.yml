@@ -12,19 +12,23 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      issues: write
     steps:
       - name: Install yt-dlp
         run: pip install -q -U yt-dlp && yt-dlp --version
-      - name: Dump formats
+      - name: Dump formats and report via issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yt-dlp -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
           cat formats.txt
-          echo "--- default client ---"
-          yt-dlp --extractor-args "youtube:player_client=default" -F "${{ inputs.video_url }}" >> formats.txt 2>&1 || true
+          BODY=$(cat formats.txt | head -c 60000)
+          gh issue create --title "yt-formats ${{ github.run_id }}" --body "$BODY" > issue_url.txt
+          cat issue_url.txt
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: yt-formats
           path: formats.txt
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: error
