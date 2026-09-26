@@ -45,7 +45,7 @@ jobs:
           COOKIE_ARG=""
           [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
           # shellcheck disable=SC2086
-          yt-dlp $COOKIE_ARG -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
+          yt-dlp $COOKIE_ARG --extractor-args "youtube:player_client=android,web" -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
           cat formats.txt
 
       - name: Download section
@@ -53,7 +53,7 @@ jobs:
           COOKIE_ARG=""
           [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
           # shellcheck disable=SC2086
-          yt-dlp --verbose $COOKIE_ARG -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
+          yt-dlp --verbose $COOKIE_ARG --extractor-args "youtube:player_client=android,web" -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
             --download-sections "${{ inputs.section }}" \
             -o "${{ inputs.out_name }}.%(ext)s" \
             "${{ inputs.video_url }}" 2>&1 | tail -30
