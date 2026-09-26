@@ -26,15 +26,20 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Install yt-dlp
-        run: pip install -q yt-dlp
+      - name: Install yt-dlp (latest)
+        run: pip install -q -U yt-dlp && yt-dlp --version
+
+      - name: Dump available formats (diagnostic)
+        run: |
+          yt-dlp -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
+          cat formats.txt
 
       - name: Download section
         run: |
-          yt-dlp -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
+          yt-dlp --verbose -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
             --download-sections "${{ inputs.section }}" \
             -o "${{ inputs.out_name }}.%(ext)s" \
-            "${{ inputs.video_url }}"
+            "${{ inputs.video_url }}" 2>&1 | tail -30
           ls -la "${{ inputs.out_name }}."*
 
       - name: Probe resolution
@@ -47,6 +52,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: video-section-${{ inputs.out_name }}
-          path: "${{ inputs.out_name }}.*"
+          path: |
+            ${{ inputs.out_name }}.*
+            formats.txt
           retention-days: 7
           if-no-files-found: error
