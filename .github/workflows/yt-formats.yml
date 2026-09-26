@@ -1,0 +1,30 @@
+name: YT formats diagnostic
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Video URL"
+        required: true
+        type: string
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Install yt-dlp
+        run: pip install -q -U yt-dlp && yt-dlp --version
+      - name: Dump formats
+        run: |
+          yt-dlp -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
+          cat formats.txt
+          echo "--- default client ---"
+          yt-dlp --extractor-args "youtube:player_client=default" -F "${{ inputs.video_url }}" >> formats.txt 2>&1 || true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yt-formats
+          path: formats.txt
+          retention-days: 7
+          if-no-files-found: error
