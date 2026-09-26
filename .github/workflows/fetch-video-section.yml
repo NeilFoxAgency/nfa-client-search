@@ -29,14 +29,31 @@ jobs:
       - name: Install yt-dlp (latest)
         run: pip install -q -U yt-dlp && yt-dlp --version
 
+      - name: Write YouTube cookies (if configured)
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -n "$YT_COOKIES" ]; then
+            printf '%s' "$YT_COOKIES" > yt_cookies.txt
+            echo "YouTube cookies configured"
+          else
+            echo "No YouTube cookies configured; proceeding without"
+          fi
+
       - name: Dump available formats (diagnostic)
         run: |
-          yt-dlp -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
+          COOKIE_ARG=""
+          [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
+          # shellcheck disable=SC2086
+          yt-dlp $COOKIE_ARG -F "${{ inputs.video_url }}" > formats.txt 2>&1 || true
           cat formats.txt
 
       - name: Download section
         run: |
-          yt-dlp --verbose -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
+          COOKIE_ARG=""
+          [ -f yt_cookies.txt ] && COOKIE_ARG="--cookies yt_cookies.txt"
+          # shellcheck disable=SC2086
+          yt-dlp --verbose $COOKIE_ARG -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
             --download-sections "${{ inputs.section }}" \
             -o "${{ inputs.out_name }}.%(ext)s" \
             "${{ inputs.video_url }}" 2>&1 | tail -30
@@ -47,6 +64,10 @@ jobs:
           ffprobe -v error -select_streams v:0 \
             -show_entries stream=width,height,codec_name,duration \
             -of default=noprint_wrappers=1 "${{ inputs.out_name }}."* | head -5 || true
+
+      - name: Remove cookies file (never upload the secret)
+        if: always()
+        run: rm -f yt_cookies.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
