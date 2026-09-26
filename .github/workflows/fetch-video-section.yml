@@ -1,0 +1,52 @@
+name: Fetch video section (yt-dlp)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Full video URL to download from"
+        required: true
+        type: string
+      section:
+        description: 'yt-dlp --download-sections value, e.g. *00:42:30-00:43:30'
+        required: true
+        type: string
+      out_name:
+        description: "Base name for the output file (no extension)"
+        required: true
+        type: string
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Install yt-dlp
+        run: pip install -q yt-dlp
+
+      - name: Download section
+        run: |
+          yt-dlp -f "bv*[height<=1080]+ba/b[height<=1080]/b" \
+            --download-sections "${{ inputs.section }}" \
+            -o "${{ inputs.out_name }}.%(ext)s" \
+            "${{ inputs.video_url }}"
+          ls -la "${{ inputs.out_name }}."*
+
+      - name: Probe resolution
+        run: |
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,codec_name,duration \
+            -of default=noprint_wrappers=1 "${{ inputs.out_name }}."* | head -5 || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-section-${{ inputs.out_name }}
+          path: "${{ inputs.out_name }}.*"
+          retention-days: 7
+          if-no-files-found: error
